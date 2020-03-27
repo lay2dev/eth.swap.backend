@@ -4,6 +4,7 @@ import { EthTransfer } from '../exchange/ethtransfer.entity';
 import { ETHTRANSFER_REPOSITORY, SWAP_STATUS } from '../util/constant';
 import { LoggerService } from 'nest-logger';
 import { ConfigService } from 'src/config/config.service';
+import { Op } from 'sequelize';
 import {
   init,
   EtherscanApi,
@@ -64,7 +65,13 @@ export class SyncService extends NestSchedule {
       ),
     );
     const lastProcessedBlockNumber = Number(
-      (await this.ethTransferModel.max('block')) || 0,
+      (await this.ethTransferModel.max('block', {
+        where: {
+          status: {
+            [Op.gte]: SWAP_STATUS.CONFIRMED,
+          },
+        },
+      })) || 0,
     );
     this.logger.info(
       `startBlock=[${lastProcessedBlockNumber}], endBlock=[${latestBlockNumber}] `,
