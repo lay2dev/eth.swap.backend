@@ -69,9 +69,11 @@ export class SwapService {
   async getConfig() {
     const tokenList = this.config.tokenList;
     const chain = this.config.get('ETH_CHAIN');
+    const feeRate = this.config.SWAP_FEE_RATE;
 
     return {
       chain,
+      feeRate,
       depositEthAddress: this.depositEthAddress,
       tokenList,
     };
@@ -87,7 +89,16 @@ export class SwapService {
       tokenRateList.push({ symbol, price });
     }
     const ckbPrice = await this.redisService.getClient().get(`CKB_price`);
-    tokenRateList.push({ symbol: 'CKB', price: ckbPrice });
+
+    const pricePlusRate =
+      Math.floor(
+        Number(ckbPrice) * 100000000 * (1 + this.config.SWAP_FEE_RATE),
+      ) / 100000000;
+
+    tokenRateList.push({
+      symbol: 'CKB',
+      price: pricePlusRate,
+    });
     return tokenRateList;
   }
 }

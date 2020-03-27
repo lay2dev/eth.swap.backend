@@ -35,7 +35,19 @@ export class ConfigService {
   }
 
   get SWAP_FEE_RATE(): number {
-    return Number(this.envConfig.SWAP_FEE_RATE);
+    return Number(this.envConfig.SWAP_FEE_RATE || 0.01);
+  }
+
+  get MAX_TRANSFER_CKB_AMOUNT(): number {
+    return Number(this.envConfig.MAX_TRANSFER_CKB_AMOUNT || 110000);
+  }
+
+  get MIN_TRANSFER_CKB_AMOUNT(): number {
+    return Number(this.envConfig.MIN_TRANSFER_CKB_AMOUNT || 61);
+  }
+
+  get ETH_DEPOSIT_CONFIRMATIONS(): number {
+    return Number(this.envConfig.ETH_DEPOSIT_CONFIRMATIONS || 3);
   }
 
   get serviceName(): string {
@@ -68,7 +80,7 @@ export class ConfigService {
       {
         symbol: 'USDT',
         address: '0xdac17f958d2ee523a2206206994597c13d831ec7',
-        decimal: 18,
+        decimal: 6,
       },
     ];
   }

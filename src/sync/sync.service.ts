@@ -64,7 +64,7 @@ export class SyncService extends NestSchedule {
       ),
     );
     const lastProcessedBlockNumber = Number(
-      (await this.ethTransferModel.max('block', { where: { status: 2 } })) || 0,
+      (await this.ethTransferModel.max('block')) || 0,
     );
     this.logger.info(
       `startBlock=[${lastProcessedBlockNumber}], endBlock=[${latestBlockNumber}] `,
@@ -193,13 +193,13 @@ export class SyncService extends NestSchedule {
       transfer.amount = Number(value);
       transfer.confirmations = Number(confirmations);
       transfer.status =
-        transfer.confirmations >= 15
+        transfer.confirmations >= this.config.ETH_DEPOSIT_CONFIRMATIONS
           ? SWAP_STATUS.CONFIRMED
           : SWAP_STATUS.CONFIRMING;
     } else if (transfer.status < 2) {
       transfer.confirmations = Number(confirmations);
       transfer.status =
-        transfer.confirmations >= 15
+        transfer.confirmations >= this.config.ETH_DEPOSIT_CONFIRMATIONS
           ? SWAP_STATUS.CONFIRMED
           : SWAP_STATUS.CONFIRMING;
     } else {
@@ -212,13 +212,13 @@ export class SyncService extends NestSchedule {
     // set price related attributes
     if (transfer.status === SWAP_STATUS.CONFIRMED) {
       const tokenPrice = Number(
-        await this.redisService.getClient().get(`${token.toLowerCase()}_price`),
+        await this.redisService.getClient().get(`${token.toUpperCase()}_price`),
       );
       const ckbPrice = Number(
         await this.redisService.getClient().get('CKB_price'),
       );
       const ckbAmount = this.calculateExchangeAssets(
-        18,
+        token,
         transfer.amount,
         tokenPrice,
         ckbPrice,
@@ -227,6 +227,14 @@ export class SyncService extends NestSchedule {
         `tokenPrice=${tokenPrice}, ckbPrice=${ckbPrice}, tokenAmount=${transfer.amount}, ckbAmount=${ckbAmount}`,
         SyncService.name,
       );
+
+      if (
+        ckbAmount / 10 ** 8 < this.config.MIN_TRANSFER_CKB_AMOUNT ||
+        ckbAmount / 10 ** 8 > this.config.MAX_TRANSFER_CKB_AMOUNT
+      ) {
+        transfer.status = SWAP_STATUS.IGNORED;
+      }
+
       transfer.currencyPrice = tokenPrice;
       transfer.ckbPrice = ckbPrice;
       transfer.ckbAmount = ckbAmount;
@@ -243,28 +251,35 @@ export class SyncService extends NestSchedule {
    * @param ckbPrice
    */
   calculateExchangeAssets(
-    tokenDecimal: number,
+    tokenName: string,
     amount: number,
     tokenPrice: number,
     ckbPrice: number,
   ): number {
-    const tokenPriceBN = web3Utils.toBN(
-      Math.floor(Number(tokenPrice) * 10 ** 8),
+    this.logger.info(
+      `tokenName = [${tokenName}] amount= [${amount}] tokenPrice = [${tokenPrice}] ckbPrice = [${ckbPrice}]`,
     );
-    const ckbPriceBN = web3Utils.toBN(Math.floor(Number(ckbPrice) * 10 ** 8));
+
+    const tokenDecimal = this.config.tokenList.filter(
+      item => item.symbol === tokenName,
+    )[0].decimal;
+
+    const { toBN } = web3Utils;
+    const tokenPriceBN = toBN(Math.floor(Number(tokenPrice) * 10 ** 8));
+    const ckbPriceBN = toBN(Math.floor(Number(ckbPrice) * 10 ** 8));
     const ckbDecimal = 8;
 
-    const feeRateBN = web3Utils.toBN((1 - this.config.SWAP_FEE_RATE) * 10000);
-    const feeRateBaseBN = web3Utils.toBN(10000);
+    const feeRateBN = toBN((1 - this.config.SWAP_FEE_RATE) * 10000);
+    const feeRateBaseBN = toBN(10000);
 
     const ckbAmount = Number(
-      web3Utils
-        .toBN(amount)
-        .add(tokenPriceBN)
+      toBN(amount)
+        .mul(tokenPriceBN)
         .div(ckbPriceBN)
-        .div(web3Utils.toBN(tokenDecimal - ckbDecimal))
         .mul(feeRateBN)
         .div(feeRateBaseBN)
+        .mul(toBN(10 ** ckbDecimal))
+        .div(toBN(10 ** tokenDecimal))
         .toString(10),
     );
 

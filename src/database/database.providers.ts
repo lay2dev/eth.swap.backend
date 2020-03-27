@@ -14,6 +14,7 @@ export const databaseProviders = [
         password: config.get('DATABASE_PASSWORD'),
         database: config.get('DATABASE_NAME'),
         logging: config.get('SEQUELIZE_ENABLE_LOGGING') === 'true',
+        timezone: '+08:00',
       });
       sequelize.addModels([EthTransfer]);
       await sequelize.sync({ force: false });

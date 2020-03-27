@@ -15,4 +15,5 @@ export enum SWAP_STATUS {
   CONFIRMED,
   DELIVERING,
   DELIVERED,
+  IGNORED,
 }
