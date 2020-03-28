@@ -6,10 +6,11 @@ import { DatabaseModule } from 'src/database/database.module';
 import { RedisModule } from 'nestjs-redis';
 import { LoggerModule } from 'src/logger/logger.module';
 import { ethTransferProviders } from 'src/exchange/ethtransfer.providers';
+import { pendingSwapProviders } from 'src/exchange/pendingswap.providers';
 
 @Module({
   imports: [ConfigModule, DatabaseModule, RedisModule, LoggerModule],
-  providers: [SwapService, ...ethTransferProviders],
+  providers: [SwapService, ...ethTransferProviders, ...pendingSwapProviders],
   controllers: [SwapController],
 })
 export class SwapModule {}

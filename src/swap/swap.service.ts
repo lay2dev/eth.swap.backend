@@ -1,9 +1,13 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { ETHTRANSFER_REPOSITORY } from 'src/util/constant';
+import {
+  ETHTRANSFER_REPOSITORY,
+  PENDINGSWAP_REPOSITORY,
+} from 'src/util/constant';
 import { EthTransfer } from 'src/exchange/ethtransfer.entity';
 import { LoggerService } from 'nest-logger';
 import { ConfigService } from 'src/config/config.service';
 import { RedisService } from 'nestjs-redis';
+import { PendingSwap } from 'src/exchange/pendingswap.entity';
 
 @Injectable()
 export class SwapService {
@@ -12,6 +16,8 @@ export class SwapService {
   constructor(
     @Inject(ETHTRANSFER_REPOSITORY)
     private readonly ethTransferModel: typeof EthTransfer,
+    @Inject(PENDINGSWAP_REPOSITORY)
+    private readonly pendingSwapModel: typeof PendingSwap,
     private readonly logger: LoggerService,
     private readonly config: ConfigService,
     private readonly redisService: RedisService,
@@ -70,12 +76,14 @@ export class SwapService {
     const tokenList = this.config.tokenList;
     const chain = this.config.get('ETH_CHAIN');
     const feeRate = this.config.SWAP_FEE_RATE;
+    const swapCKBAmountList = [100, 1000, 10000, 100000];
 
     return {
       chain,
       feeRate,
       depositEthAddress: this.depositEthAddress,
       tokenList,
+      swapCKBAmountList,
     };
   }
 
@@ -100,5 +108,33 @@ export class SwapService {
       price: pricePlusRate,
     });
     return tokenRateList;
+  }
+
+  async submitPendingSwap(
+    txhash: string,
+    ckbAmount: number,
+    tokenSymbol: string,
+    tokenAmount: number,
+    from: string,
+  ) {
+    const tokenSymbolList = this.config.tokenList.map(item => item.symbol);
+
+    //TODO: check pending swap;
+
+    if (txhash.length !== 66 || tokenSymbolList.indexOf(tokenSymbol) < 0) {
+      return false;
+    }
+
+    const pendingSwap = new PendingSwap();
+
+    pendingSwap.txhash = txhash;
+    pendingSwap.ckbAmount = ckbAmount;
+    pendingSwap.currency = tokenSymbol;
+    pendingSwap.amount = tokenAmount;
+    pendingSwap.from = from;
+
+    await pendingSwap.save();
+
+    return true;
   }
 }
