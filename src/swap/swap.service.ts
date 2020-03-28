@@ -76,7 +76,7 @@ export class SwapService {
     const tokenList = this.config.tokenList;
     const chain = this.config.get('ETH_CHAIN');
     const feeRate = this.config.SWAP_FEE_RATE;
-    const swapCKBAmountList = [100, 1000, 10000, 100000];
+    const swapCKBAmountList = this.config.ckbAmountList;
 
     return {
       chain,
