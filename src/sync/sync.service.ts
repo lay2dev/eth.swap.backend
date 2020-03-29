@@ -18,6 +18,7 @@ import {
   TokenTransaction,
 } from 'etherscan-api';
 import { ExchangeService } from 'src/exchange/exchange.service';
+import { CkbService } from 'src/ckb/ckb.service';
 
 @Injectable()
 export class SyncService extends NestSchedule {
@@ -30,6 +31,7 @@ export class SyncService extends NestSchedule {
     private readonly logger: LoggerService,
     private readonly config: ConfigService,
     private readonly exchangeService: ExchangeService,
+    private readonly ckbService: CkbService,
   ) {
     super();
     this.etherscanApi = init(
@@ -59,7 +61,7 @@ export class SyncService extends NestSchedule {
   /**
    * request recent txs from etherscanapi every 5 seconds, and process these txs.
    */
-  @Interval(15 * 1000)
+  @Interval(5 * 1000)
   async syncEthTransfers() {
     // get eth latest block number
     const latestBlockNumber = Number(
@@ -263,5 +265,9 @@ export class SyncService extends NestSchedule {
     }
 
     await transfer.save();
+
+    if (transfer.status === SWAP_STATUS.CONFIRMED) {
+      await this.ckbService.deliverCKB(transfer);
+    }
   }
 }

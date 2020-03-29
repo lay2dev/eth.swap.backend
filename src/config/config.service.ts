@@ -83,7 +83,7 @@ export class ConfigService {
       },
       {
         symbol: 'USDT',
-        address: '0xdac17f958d2ee523a2206206994597c13d831ec7',
+        address: '0x2aE17414B25264385b27Fa969D3db110Bd9C7AEf',
         decimal: 6,
       },
     ];

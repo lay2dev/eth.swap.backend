@@ -6,6 +6,7 @@ import { SyncService } from './sync.service';
 import { LoggerModule } from 'src/logger/logger.module';
 import { ethTransferProviders } from 'src/exchange/ethtransfer.providers';
 import { ExchangeModule } from 'src/exchange/exchange.module';
+import { CkbModule } from 'src/ckb/ckb.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ExchangeModule } from 'src/exchange/exchange.module';
     RedisModule,
     DatabaseModule,
     ExchangeModule,
+    CkbModule,
   ],
   providers: [SyncService, ...ethTransferProviders],
 })

@@ -61,7 +61,7 @@ export class CkbService extends NestSchedule {
   /**
    * deliver CKB to user according to eth transfer's status
    */
-  @Interval(15 * 1000)
+  @Interval(5 * 1000)
   async checkDeliverCKB() {
     // check status of delivering txs on CKB, update transfer status to finished
     const deliveredTransfers = await this.ethTransferModel.findAll({
@@ -143,13 +143,10 @@ export class CkbService extends NestSchedule {
     tx1.witnesses = tx1.inputs.map(() => '0x');
     tx1.witnesses.unshift({ lock: '', inputType: '', outputType: '' });
     const txSize = getTxSize(tx1);
-    console.log('txSize is', txSize, this.config.CKB_TX_FEE_RATE);
     const fee = calculateTransactionFee(
       numberToHex(txSize),
       numberToHex(this.config.CKB_TX_FEE_RATE),
     );
-
-    console.log('tx fee', fee);
 
     const rawTransaction = await ckb.generateRawTransaction({
       fromAddress,
