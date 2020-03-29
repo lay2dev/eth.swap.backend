@@ -1,7 +1,11 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NestSchedule, Interval } from 'nest-schedule';
 import { EthTransfer } from '../exchange/ethtransfer.entity';
-import { ETHTRANSFER_REPOSITORY, SWAP_STATUS } from '../util/constant';
+import {
+  ETHTRANSFER_REPOSITORY,
+  SWAP_STATUS,
+  CKBConvertInfo,
+} from '../util/constant';
 import { LoggerService } from 'nest-logger';
 import { ConfigService } from 'src/config/config.service';
 import { Op } from 'sequelize';
@@ -13,8 +17,7 @@ import {
   Transaction,
   TokenTransaction,
 } from 'etherscan-api';
-import { RedisService } from 'nestjs-redis';
-import * as web3Utils from 'web3-utils';
+import { ExchangeService } from 'src/exchange/exchange.service';
 
 @Injectable()
 export class SyncService extends NestSchedule {
@@ -26,7 +29,7 @@ export class SyncService extends NestSchedule {
     private readonly ethTransferModel: typeof EthTransfer,
     private readonly logger: LoggerService,
     private readonly config: ConfigService,
-    private readonly redisService: RedisService, // private readonly ckbService: CkbService, // private readonly cellService: CellService,
+    private readonly exchangeService: ExchangeService,
   ) {
     super();
     this.etherscanApi = init(
@@ -204,6 +207,12 @@ export class SyncService extends NestSchedule {
           ? SWAP_STATUS.CONFIRMED
           : SWAP_STATUS.CONFIRMING;
     } else if (transfer.status < 2) {
+      transfer.block = Number(blockNumber);
+      transfer.currency = token;
+      transfer.from = from;
+      transfer.to = to;
+      transfer.amount = Number(value);
+
       transfer.confirmations = Number(confirmations);
       transfer.status =
         transfer.confirmations >= this.config.ETH_DEPOSIT_CONFIRMATIONS
@@ -216,80 +225,43 @@ export class SyncService extends NestSchedule {
       );
       return;
     }
+
     // set price related attributes
     if (transfer.status === SWAP_STATUS.CONFIRMED) {
-      const tokenPrice = Number(
-        await this.redisService.getClient().get(`${token.toUpperCase()}_price`),
-      );
-      const ckbPrice = Number(
-        await this.redisService.getClient().get('CKB_price'),
-      );
-      const ckbAmount = this.calculateExchangeAssets(
-        token,
-        transfer.amount,
-        tokenPrice,
-        ckbPrice,
-      );
-      this.logger.info(
-        `tokenPrice=${tokenPrice}, ckbPrice=${ckbPrice}, tokenAmount=${transfer.amount}, ckbAmount=${ckbAmount}`,
-        SyncService.name,
-      );
-
-      if (
-        ckbAmount / 10 ** 8 < this.config.MIN_TRANSFER_CKB_AMOUNT ||
-        ckbAmount / 10 ** 8 > this.config.MAX_TRANSFER_CKB_AMOUNT
-      ) {
+      // user not send transfer request
+      if (!transfer.ckbAmount) {
         transfer.status = SWAP_STATUS.IGNORED;
-      }
+      } else {
+        const {
+          swapFeeAmount,
+          ckbAmount: convertedCkbAmount,
+          tokenPrice,
+          ckbPrice,
+        } = await this.exchangeService.ConvertAsset(token, transfer.amount);
+        this.logger.info(
+          `tokenPrice=${tokenPrice}, ckbPrice=${ckbPrice}, tokenAmount=${transfer.amount}, ckbAmount=${transfer.ckbAmount}, convertedCkbAmount = ${convertedCkbAmount}`,
+          SyncService.name,
+        );
 
-      transfer.currencyPrice = tokenPrice;
-      transfer.ckbPrice = ckbPrice;
-      transfer.ckbAmount = ckbAmount;
+        if (
+          convertedCkbAmount / 10 ** 8 < this.config.MIN_TRANSFER_CKB_AMOUNT ||
+          convertedCkbAmount / 10 ** 8 > this.config.MAX_TRANSFER_CKB_AMOUNT ||
+          !transfer.ckbAmount
+        ) {
+          transfer.status = SWAP_STATUS.IGNORED;
+        }
+
+        transfer.currencyPrice = tokenPrice;
+        transfer.ckbPrice = ckbPrice;
+        transfer.convertedCkbAmount = convertedCkbAmount;
+        transfer.swapFee = swapFeeAmount;
+        transfer.transferCkbAmount = Math.min(
+          Math.round(convertedCkbAmount / 10 ** 8) * 10 ** 8,
+          transfer.ckbAmount,
+        );
+      }
     }
 
     await transfer.save();
-  }
-
-  /**
-   * calculate the corresponding ckb amount for received token at current price from exchanges
-   * @param tokenDecimal
-   * @param amount
-   * @param tokenPrice
-   * @param ckbPrice
-   */
-  calculateExchangeAssets(
-    tokenName: string,
-    amount: number,
-    tokenPrice: number,
-    ckbPrice: number,
-  ): number {
-    this.logger.info(
-      `tokenName = [${tokenName}] amount= [${amount}] tokenPrice = [${tokenPrice}] ckbPrice = [${ckbPrice}]`,
-    );
-
-    const tokenDecimal = this.config.tokenList.filter(
-      item => item.symbol === tokenName,
-    )[0].decimal;
-
-    const { toBN } = web3Utils;
-    const tokenPriceBN = toBN(Math.floor(Number(tokenPrice) * 10 ** 8));
-    const ckbPriceBN = toBN(Math.floor(Number(ckbPrice) * 10 ** 8));
-    const ckbDecimal = 8;
-
-    const feeRateBN = toBN((1 - this.config.SWAP_FEE_RATE) * 10000);
-    const feeRateBaseBN = toBN(10000);
-
-    const ckbAmount = Number(
-      toBN(amount)
-        .mul(tokenPriceBN)
-        .div(ckbPriceBN)
-        .mul(feeRateBN)
-        .div(feeRateBaseBN)
-        .mul(toBN(10 ** ckbDecimal))
-        .div(toBN(10 ** tokenDecimal))
-        .toString(10),
-    );
-
-    return ckbAmount;
   }
 }

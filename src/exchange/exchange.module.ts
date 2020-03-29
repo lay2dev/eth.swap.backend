@@ -10,5 +10,6 @@ import { ethTransferProviders } from './ethtransfer.providers';
   imports: [DatabaseModule, LoggerModule, ConfigModule, RedisModule],
   controllers: [],
   providers: [ExchangeService, ...ethTransferProviders],
+  exports: [ExchangeService],
 })
 export class ExchangeModule {}

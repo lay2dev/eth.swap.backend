@@ -18,3 +18,13 @@ export enum SWAP_STATUS {
   DELIVERED,
   IGNORED,
 }
+
+export interface CKBConvertInfo {
+  tokenSymbol: string;
+  tokenPrice: number;
+  tokenAmount: number;
+  ckbPrice: number;
+  ckbAmount: number;
+  swapFeeAmount: number;
+  exchangeFee: number;
+}

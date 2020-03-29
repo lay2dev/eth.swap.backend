@@ -87,7 +87,7 @@ export class CkbService extends NestSchedule {
   async deliverCKB(transfer: EthTransfer) {
     // build ckb transaction
     const ckb = this.getCKB();
-    const capacity = transfer.ckbAmount;
+    const capacity = transfer.transferCkbAmount;
 
     if (capacity < 61 * 10 ** 8) {
       this.logger.error(
@@ -126,11 +126,13 @@ export class CkbService extends NestSchedule {
       .getClient()
       .set(redisLastIdKey, unspentCells[unspentCells.length - 1].id);
 
+    const fee = 100000;
+
     const rawTransaction = await ckb.generateRawTransaction({
       fromAddress,
       toAddress,
       capacity: BigInt(capacity),
-      fee: BigInt(100000),
+      fee: BigInt(fee),
       safeMode: true,
       cells: unspentCells,
       deps: ckb.config.secp256k1Dep,
@@ -154,6 +156,7 @@ export class CkbService extends NestSchedule {
     this.logger.info(`signedTx  ${JSON.stringify(signedTx)}`, CkbService.name);
     const realTxHash = await ckb.rpc.sendTransaction(signedTx);
     // set txHash to database, update transfer status
+    transfer.transferCkbFee = fee;
     transfer.ckbTxHash = realTxHash;
     transfer.status = SWAP_STATUS.DELIVERING;
     await transfer.save();

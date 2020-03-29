@@ -2,12 +2,13 @@ import { Injectable, Inject } from '@nestjs/common';
 import {
   ETHTRANSFER_REPOSITORY,
   PENDINGSWAP_REPOSITORY,
+  SWAP_STATUS,
 } from 'src/util/constant';
 import { EthTransfer } from 'src/exchange/ethtransfer.entity';
 import { LoggerService } from 'nest-logger';
 import { ConfigService } from 'src/config/config.service';
 import { RedisService } from 'nestjs-redis';
-import { PendingSwap } from 'src/exchange/pendingswap.entity';
+import * as web3Utils from 'web3-utils';
 
 @Injectable()
 export class SwapService {
@@ -16,8 +17,6 @@ export class SwapService {
   constructor(
     @Inject(ETHTRANSFER_REPOSITORY)
     private readonly ethTransferModel: typeof EthTransfer,
-    @Inject(PENDINGSWAP_REPOSITORY)
-    private readonly pendingSwapModel: typeof PendingSwap,
     private readonly logger: LoggerService,
     private readonly config: ConfigService,
     private readonly redisService: RedisService,
@@ -27,6 +26,9 @@ export class SwapService {
 
   async getUserTransfers(ethAddress: string): Promise<any[]> {
     // check address format
+    if (!web3Utils.isAddress(ethAddress)) {
+      return [];
+    }
 
     // fetch transfer from table order by id desc
     const transfers = await this.ethTransferModel.findAll({
@@ -88,6 +90,7 @@ export class SwapService {
   }
 
   async exchangeRate() {
+    const { toBN } = web3Utils;
     const tokenList = this.config.tokenList;
 
     const tokenRateList = [];
@@ -99,9 +102,11 @@ export class SwapService {
     const ckbPrice = await this.redisService.getClient().get(`CKB_price`);
 
     const pricePlusRate =
-      Math.floor(
-        Number(ckbPrice) * 100000000 * (1 + this.config.SWAP_FEE_RATE),
-      ) / 100000000;
+      toBN(Math.floor(Number(ckbPrice) * 10 ** 8))
+        .mul(toBN(10 ** 6))
+        .div(toBN(Math.floor((1 - this.config.SWAP_FEE_RATE) * 10 ** 8)))
+        .toNumber() /
+      10 ** 6;
 
     tokenRateList.push({
       symbol: 'CKB',
@@ -119,21 +124,30 @@ export class SwapService {
   ) {
     const tokenSymbolList = this.config.tokenList.map(item => item.symbol);
 
-    //TODO: check pending swap;
-
     if (txhash.length !== 66 || tokenSymbolList.indexOf(tokenSymbol) < 0) {
       return false;
     }
 
-    const pendingSwap = new PendingSwap();
+    let ethTransfer = await this.ethTransferModel.findOne({
+      where: { txhash },
+    });
 
-    pendingSwap.txhash = txhash;
-    pendingSwap.ckbAmount = ckbAmount;
-    pendingSwap.currency = tokenSymbol;
-    pendingSwap.amount = tokenAmount;
-    pendingSwap.from = from;
+    if (ethTransfer) {
+      if (ethTransfer.status !== SWAP_STATUS.CONFIRMING) {
+        return false;
+      }
+    } else {
+      ethTransfer = new EthTransfer();
+      ethTransfer.txhash = txhash;
+      ethTransfer.status = SWAP_STATUS.CONFIRMING;
+    }
 
-    await pendingSwap.save();
+    ethTransfer.ckbAmount = Number(ckbAmount) * 10 ** 8;
+    ethTransfer.currency = tokenSymbol;
+    ethTransfer.amount = tokenAmount;
+    ethTransfer.from = from;
+
+    await ethTransfer.save();
 
     return true;
   }

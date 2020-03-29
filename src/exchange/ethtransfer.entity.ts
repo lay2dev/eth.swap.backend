@@ -35,6 +35,9 @@ export class EthTransfer extends Model<EthTransfer> {
   @Column(DataType.DECIMAL(60, 0))
   amount: number;
 
+  @Column(DataType.DECIMAL(60, 0))
+  swapFee: number;
+
   @Column(DataType.INTEGER)
   confirmations: number;
 
@@ -49,6 +52,15 @@ export class EthTransfer extends Model<EthTransfer> {
 
   @Column(DataType.DECIMAL(60, 0))
   ckbAmount: number;
+
+  @Column(DataType.DECIMAL(60, 0))
+  convertedCkbAmount: number;
+
+  @Column(DataType.DECIMAL(60, 0))
+  transferCkbAmount: number;
+
+  @Column(DataType.DECIMAL(60, 0))
+  transferCkbFee: number;
 
   @Column(DataType.INTEGER)
   status: number;

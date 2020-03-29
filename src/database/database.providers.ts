@@ -1,7 +1,6 @@
 import { Sequelize } from 'sequelize-typescript';
 import { ConfigService } from '../config/config.service';
 import { EthTransfer } from 'src/exchange/ethtransfer.entity';
-import { PendingSwap } from 'src/exchange/pendingswap.entity';
 
 export const databaseProviders = [
   {
@@ -17,8 +16,8 @@ export const databaseProviders = [
         logging: config.get('SEQUELIZE_ENABLE_LOGGING') === 'true',
         timezone: '+08:00',
       });
-      sequelize.addModels([EthTransfer, PendingSwap]);
-      await sequelize.sync({ force: true });
+      sequelize.addModels([EthTransfer]);
+      await sequelize.sync({ force: false });
       return sequelize;
     },
     inject: [ConfigService],
