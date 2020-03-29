@@ -83,13 +83,21 @@ export class ConfigService {
       },
       {
         symbol: 'USDT',
-        address: '0x2aE17414B25264385b27Fa969D3db110Bd9C7AEf',
+        address:
+          this.envConfig.USDT_TOKEN_ADDRESS ||
+          '0xdac17f958d2ee523a2206206994597c13d831ec7',
         decimal: 6,
       },
     ];
   }
 
   get ckbAmountList(): number[] {
-    return [200, 500, 1000, 2000, 5000, 10000];
+    if (!this.envConfig.CKB_SWAP_AMOUNTS) {
+      return [500, 1000, 2000, 5000, 10000];
+    } else {
+      return this.envConfig.CKB_SWAP_AMOUNTS.split(',').map(v =>
+        Number(v.replace(' ', '')),
+      );
+    }
   }
 }
