@@ -1,6 +1,9 @@
 import { Injectable, Inject, HttpService } from '@nestjs/common';
 import Core from '@nervosnetwork/ckb-sdk-core';
-import { AddressPrefix } from '@nervosnetwork/ckb-sdk-utils';
+import {
+  AddressPrefix,
+  calculateTransactionFee,
+} from '@nervosnetwork/ckb-sdk-utils';
 import { ConfigService } from 'src/config/config.service';
 import * as http from 'http';
 import { NestSchedule, Interval } from 'nest-schedule';
@@ -9,6 +12,8 @@ import { EthTransfer } from 'src/exchange/ethtransfer.entity';
 import { LoggerService } from 'nest-logger';
 import { RedisService } from 'nestjs-redis';
 import { Cell } from '@nervosnetwork/ckb-sdk-core/lib/generateRawTransaction';
+import { getTxSize } from '../util/txSize';
+import { numberToHex } from 'web3-utils';
 
 export declare type CellPlus = Cell & { id: string };
 
@@ -126,7 +131,25 @@ export class CkbService extends NestSchedule {
       .getClient()
       .set(redisLastIdKey, unspentCells[unspentCells.length - 1].id);
 
-    const fee = 100000;
+    const tx1 = await ckb.generateRawTransaction({
+      fromAddress,
+      toAddress,
+      capacity: BigInt(capacity),
+      fee: BigInt(0),
+      safeMode: true,
+      cells: unspentCells,
+      deps: ckb.config.secp256k1Dep,
+    });
+    tx1.witnesses = tx1.inputs.map(() => '0x');
+    tx1.witnesses.unshift({ lock: '', inputType: '', outputType: '' });
+    const txSize = getTxSize(tx1);
+    console.log('txSize is', txSize, this.config.CKB_TX_FEE_RATE);
+    const fee = calculateTransactionFee(
+      numberToHex(txSize),
+      numberToHex(this.config.CKB_TX_FEE_RATE),
+    );
+
+    console.log('tx fee', fee);
 
     const rawTransaction = await ckb.generateRawTransaction({
       fromAddress,
@@ -156,7 +179,7 @@ export class CkbService extends NestSchedule {
     this.logger.info(`signedTx  ${JSON.stringify(signedTx)}`, CkbService.name);
     const realTxHash = await ckb.rpc.sendTransaction(signedTx);
     // set txHash to database, update transfer status
-    transfer.transferCkbFee = fee;
+    transfer.transferCkbFee = Number(fee);
     transfer.ckbTxHash = realTxHash;
     transfer.status = SWAP_STATUS.DELIVERING;
     await transfer.save();

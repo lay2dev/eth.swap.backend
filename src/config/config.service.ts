@@ -50,6 +50,10 @@ export class ConfigService {
     return Number(this.envConfig.ETH_DEPOSIT_CONFIRMATIONS || 3);
   }
 
+  get CKB_TX_FEE_RATE(): number {
+    return Number(this.envConfig.CKB_TX_FEE_RATE) || 1000;
+  }
+
   get serviceName(): string {
     return 'cellmap';
   }
