@@ -54,6 +54,28 @@ export class ConfigService {
     return Number(this.envConfig.CKB_TX_FEE_RATE) || 1000;
   }
 
+  get SWAP_WEBHOOK(): string {
+    return this.envConfig.SWAP_WEBHOOK;
+  }
+
+  get CKB_EXPLORER_URL(): string {
+    return this.envConfig.CKB_EXPLORER_URL;
+  }
+
+  get ETH_EXPLORER_URL(): string {
+    const chainType = this.envConfig.ETH_CHAIN || 'mainnet';
+
+    switch (chainType) {
+      case 'ropsten':
+        return 'https://ropsten.etherscan.io/';
+      case 'rinkeby':
+        return 'https://rinkeby.etherscan.io/';
+      case 'mainnet':
+      default:
+        return 'https://etherscan.io/';
+    }
+  }
+
   get serviceName(): string {
     return 'cellmap';
   }
@@ -83,9 +105,7 @@ export class ConfigService {
       },
       {
         symbol: 'USDT',
-        address:
-          this.envConfig.USDT_TOKEN_ADDRESS ||
-          '0xdac17f958d2ee523a2206206994597c13d831ec7',
+        address: this.envConfig.USDT_TOKEN_ADDRESS || '0xdac17f958d2ee523a2206206994597c13d831ec7',
         decimal: 6,
       },
     ];
@@ -95,9 +115,7 @@ export class ConfigService {
     if (!this.envConfig.CKB_SWAP_AMOUNTS) {
       return [500, 1000, 2000, 5000, 10000];
     } else {
-      return this.envConfig.CKB_SWAP_AMOUNTS.split(',').map(v =>
-        Number(v.replace(' ', '')),
-      );
+      return this.envConfig.CKB_SWAP_AMOUNTS.split(',').map(v => Number(v.replace(' ', '')));
     }
   }
 }
