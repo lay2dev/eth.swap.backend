@@ -1,9 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import {
-  ETHTRANSFER_REPOSITORY,
-  PENDINGSWAP_REPOSITORY,
-  SWAP_STATUS,
-} from 'src/util/constant';
+import { ETHTRANSFER_REPOSITORY, PENDINGSWAP_REPOSITORY, SWAP_STATUS } from 'src/util/constant';
 import { EthTransfer } from 'src/exchange/ethtransfer.entity';
 import { LoggerService } from 'nest-logger';
 import { ConfigService } from 'src/config/config.service';
@@ -38,9 +34,7 @@ export class SwapService {
     // return transfers;
 
     return transfers.map(item => {
-      const decimal = this.config.tokenList.filter(
-        t => t.symbol === item.currency,
-      )[0].decimal;
+      const decimal = this.config.tokenList.filter(t => t.symbol === item.currency)[0].decimal;
       const {
         id,
         txhash,
@@ -72,6 +66,12 @@ export class SwapService {
         transferTime,
       };
     });
+  }
+
+  async getLatestBlock() {
+    const latestEthBlockNumber = await this.redisService.getClient().get(`swap_sync_eth_block_number`);
+
+    return { syncBlock: latestEthBlockNumber };
   }
 
   async getConfig() {
@@ -115,13 +115,7 @@ export class SwapService {
     return tokenRateList;
   }
 
-  async submitPendingSwap(
-    txhash: string,
-    ckbAmount: number,
-    tokenSymbol: string,
-    tokenAmount: number,
-    from: string,
-  ) {
+  async submitPendingSwap(txhash: string, ckbAmount: number, tokenSymbol: string, tokenAmount: number, from: string) {
     const tokenSymbolList = this.config.tokenList.map(item => item.symbol);
 
     if (txhash.length !== 66 || tokenSymbolList.indexOf(tokenSymbol) < 0) {

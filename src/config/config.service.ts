@@ -77,7 +77,7 @@ export class ConfigService {
   }
 
   get serviceName(): string {
-    return 'cellmap';
+    return 'ethswap';
   }
 
   get logger(): {

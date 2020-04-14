@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Injectable,
-  Get,
-  Query,
-  Post,
-  Param,
-  Req,
-} from '@nestjs/common';
+import { Controller, Injectable, Get, Query, Post, Param, Req } from '@nestjs/common';
 import { EthTransfer } from 'src/exchange/ethtransfer.entity';
 import { SwapService } from './swap.service';
 import { Request } from 'express';
@@ -17,15 +9,18 @@ export class SwapController {
   constructor(private readonly swapService: SwapService) {}
 
   @Get('transactions')
-  async getTransactionList(
-    @Query('address') address: string,
-  ): Promise<EthTransfer[]> {
+  async getTransactionList(@Query('address') address: string): Promise<EthTransfer[]> {
     return await this.swapService.getUserTransfers(address);
   }
 
   @Get('config')
   async getConfig(): Promise<any> {
     return await this.swapService.getConfig();
+  }
+
+  @Get('latestBlock')
+  async getLatestBlock(): Promise<any> {
+    return await this.swapService.getLatestBlock();
   }
 
   @Get('tokenRate')
@@ -37,13 +32,7 @@ export class SwapController {
   async submitPendingSwap(@Req() request: Request): Promise<any> {
     const { txhash, ckbAmount, tokenSymbol, tokenAmount, from } = request.body;
 
-    const result = await this.swapService.submitPendingSwap(
-      txhash,
-      ckbAmount,
-      tokenSymbol,
-      tokenAmount,
-      from,
-    );
+    const result = await this.swapService.submitPendingSwap(txhash, ckbAmount, tokenSymbol, tokenAmount, from);
 
     if (result) {
       return {

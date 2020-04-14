@@ -1,24 +1,14 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { NestSchedule, Interval } from 'nest-schedule';
 import { EthTransfer } from '../exchange/ethtransfer.entity';
-import {
-  ETHTRANSFER_REPOSITORY,
-  SWAP_STATUS,
-  CKBConvertInfo,
-} from '../util/constant';
+import { ETHTRANSFER_REPOSITORY, SWAP_STATUS, CKBConvertInfo } from '../util/constant';
 import { LoggerService } from 'nest-logger';
 import { ConfigService } from 'src/config/config.service';
 import { Op } from 'sequelize';
-import {
-  init,
-  EtherscanApi,
-  Response,
-  ProxyResponse,
-  Transaction,
-  TokenTransaction,
-} from 'etherscan-api';
+import { init, EtherscanApi, Response, ProxyResponse, Transaction, TokenTransaction } from 'etherscan-api';
 import { ExchangeService } from 'src/exchange/exchange.service';
 import { CkbService } from 'src/ckb/ckb.service';
+import { RedisService } from 'nestjs-redis';
 
 @Injectable()
 export class SyncService extends NestSchedule {
@@ -32,12 +22,10 @@ export class SyncService extends NestSchedule {
     private readonly config: ConfigService,
     private readonly exchangeService: ExchangeService,
     private readonly ckbService: CkbService,
+    private readonly redisService: RedisService,
   ) {
     super();
-    this.etherscanApi = init(
-      this.config.get('ETHERSCAN_TOKEN'),
-      this.config.get('ETH_CHAIN'),
-    );
+    this.etherscanApi = init(this.config.get('ETHERSCAN_TOKEN'), this.config.get('ETH_CHAIN'));
     this.depositEthAddress = this.config.get('ETH_DEPOSIT_ADDRESS');
     this.syncEthTransfers();
   }
@@ -65,9 +53,7 @@ export class SyncService extends NestSchedule {
   async syncEthTransfers() {
     // get eth latest block number
     const latestBlockNumber = Number(
-      this.getResultFromEtherscanApiProxyResponse(
-        await this.etherscanApi.proxy.eth_blockNumber(),
-      ),
+      this.getResultFromEtherscanApiProxyResponse(await this.etherscanApi.proxy.eth_blockNumber()),
     );
     const lastProcessedBlockNumber = Number(
       (await this.ethTransferModel.max('block', {
@@ -78,28 +64,16 @@ export class SyncService extends NestSchedule {
         },
       })) || 0,
     );
-    this.logger.info(
-      `startBlock=[${lastProcessedBlockNumber}], endBlock=[${latestBlockNumber}] `,
-      SyncService.name,
-    );
+    this.logger.info(`startBlock=[${lastProcessedBlockNumber}], endBlock=[${latestBlockNumber}] `, SyncService.name);
+    await this.processRecentTxs(lastProcessedBlockNumber + 1, latestBlockNumber);
 
-    await this.processRecentTxs(
-      lastProcessedBlockNumber + 1,
-      latestBlockNumber,
-    );
-
-    const erc20TokenList = this.config.tokenList.filter(
-      v => v.symbol !== 'ETH',
-    );
+    const erc20TokenList = this.config.tokenList.filter(v => v.symbol !== 'ETH');
     for (const token of erc20TokenList) {
-      await this.processRecentTokenTxs(
-        token.symbol,
-        token.address,
-        lastProcessedBlockNumber,
-        latestBlockNumber,
-      );
+      await this.processRecentTokenTxs(token.symbol, token.address, lastProcessedBlockNumber, latestBlockNumber);
     }
     this.logger.info(`syncEthTransfer job finished!`, SyncService.name);
+
+    await this.redisService.getClient().set('swap_sync_eth_block_number', latestBlockNumber);
   }
 
   /**
@@ -111,11 +85,7 @@ export class SyncService extends NestSchedule {
     let txs = [];
     try {
       txs = this.getResultFromEtherscanApiResponse(
-        await this.etherscanApi.account.txlist(
-          this.depositEthAddress,
-          startBlock,
-          endBlock,
-        ),
+        await this.etherscanApi.account.txlist(this.depositEthAddress, startBlock, endBlock),
       );
     } catch (err) {
       if (err === 'No transactions found') {
@@ -125,9 +95,7 @@ export class SyncService extends NestSchedule {
       }
     }
 
-    txs = txs.filter(
-      tx => tx.to.toLowerCase() === this.depositEthAddress.toLowerCase(),
-    );
+    txs = txs.filter(tx => tx.to.toLowerCase() === this.depositEthAddress.toLowerCase());
 
     this.logger.info(`ETH processRecentTxs txs size = ${txs.length}`);
     for (const tx of txs) {
@@ -143,41 +111,23 @@ export class SyncService extends NestSchedule {
    * @param startBlock
    * @param endBlock
    */
-  async processRecentTokenTxs(
-    tokenName: string,
-    tokenContractAddress: string,
-    startBlock: number,
-    endBlock: number,
-  ) {
+  async processRecentTokenTxs(tokenName: string, tokenContractAddress: string, startBlock: number, endBlock: number) {
     // // get ERC20 token transactions
     let tokenTxs = [];
     try {
       tokenTxs = this.getResultFromEtherscanApiResponse(
-        await this.etherscanApi.account.tokentx(
-          this.depositEthAddress,
-          tokenContractAddress,
-          startBlock,
-          endBlock,
-        ),
+        await this.etherscanApi.account.tokentx(this.depositEthAddress, tokenContractAddress, startBlock, endBlock),
       );
     } catch (err) {
       if (err === 'No transactions found') {
         this.logger.info(`${tokenName} fetch txs size == 0`, SyncService.name);
       } else {
-        this.logger.error(
-          `${tokenName} fetch txs failed: ${err}`,
-          SyncService.name,
-        );
+        this.logger.error(`${tokenName} fetch txs failed: ${err}`, SyncService.name);
       }
     }
 
-    tokenTxs = tokenTxs.filter(
-      tx => tx.to.toLowerCase() === this.depositEthAddress.toLowerCase(),
-    );
-    this.logger.info(
-      `${tokenName} processRecentTokenTxs tokenTxs size = ${tokenTxs.length}`,
-      SyncService.name,
-    );
+    tokenTxs = tokenTxs.filter(tx => tx.to.toLowerCase() === this.depositEthAddress.toLowerCase());
+    this.logger.info(`${tokenName} processRecentTokenTxs tokenTxs size = ${tokenTxs.length}`, SyncService.name);
 
     for (const tokenTx of tokenTxs) {
       await this.saveUserTransfer(tokenTx, tokenName);
@@ -221,10 +171,7 @@ export class SyncService extends NestSchedule {
           ? SWAP_STATUS.CONFIRMED
           : SWAP_STATUS.CONFIRMING;
     } else {
-      this.logger.info(
-        `txhash[${hash}] from[${from}] existed in db, will do nothing!`,
-        SyncService.name,
-      );
+      this.logger.info(`txhash[${hash}] from[${from}] existed in db, will do nothing!`, SyncService.name);
       return;
     }
 
@@ -257,10 +204,7 @@ export class SyncService extends NestSchedule {
         transfer.ckbPrice = ckbPrice;
         transfer.convertedCkbAmount = convertedCkbAmount;
         transfer.swapFee = swapFeeAmount;
-        transfer.transferCkbAmount = Math.min(
-          Math.round(convertedCkbAmount / 10 ** 8) * 10 ** 8,
-          transfer.ckbAmount,
-        );
+        transfer.transferCkbAmount = Math.min(Math.round(convertedCkbAmount / 10 ** 8) * 10 ** 8, transfer.ckbAmount);
       }
     }
 
