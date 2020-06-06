@@ -58,6 +58,18 @@ export class ConfigService {
     return this.envConfig.SWAP_WEBHOOK;
   }
 
+  get HBG_WS_URL(): string {
+    return this.envConfig.HBG_WS_URL;
+  }
+
+  get HUOBI_AK(): string {
+    return this.envConfig.HUOBI_AK;
+  }
+
+  get HUOBI_SK(): string {
+    return this.envConfig.HUOBI_SK;
+  }
+
   get CKB_EXPLORER_URL(): string {
     return this.envConfig.CKB_EXPLORER_URL;
   }
@@ -96,17 +108,19 @@ export class ConfigService {
     return { url: 'redis://:127.0.0.1:6379/1' };
   }
 
-  get tokenList(): Array<{ symbol: string; address: string; decimal: number }> {
+  get tokenList(): Array<{ symbol: string; address: string; decimal: number; minAmount: number }> {
     return [
       {
         symbol: 'ETH',
         address: '',
         decimal: 18,
+        minAmount: 0.01,
       },
       {
         symbol: 'USDT',
         address: this.envConfig.USDT_TOKEN_ADDRESS || '0xdac17f958d2ee523a2206206994597c13d831ec7',
         decimal: 6,
+        minAmount: 1,
       },
     ];
   }

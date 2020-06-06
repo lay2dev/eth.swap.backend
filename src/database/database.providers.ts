@@ -1,6 +1,8 @@
 import { Sequelize } from 'sequelize-typescript';
 import { ConfigService } from '../config/config.service';
 import { EthTransfer } from 'src/exchange/ethtransfer.entity';
+import { Clearing } from 'src/exchange/clearing.entity';
+import { MMOrder } from 'src/exchange/mmorder.entity';
 
 export const databaseProviders = [
   {
@@ -16,7 +18,7 @@ export const databaseProviders = [
         logging: config.get('SEQUELIZE_ENABLE_LOGGING') === 'true',
         timezone: '+08:00',
       });
-      sequelize.addModels([EthTransfer]);
+      sequelize.addModels([EthTransfer, Clearing, MMOrder]);
       await sequelize.sync({ force: false });
       return sequelize;
     },

@@ -76,14 +76,14 @@ export class CkbService extends NestSchedule {
     }
 
     // concurrent problem here
-    const unDevliveredTransfers = await this.ethTransferModel.findAll({
-      where: { status: SWAP_STATUS.CONFIRMED },
-    });
+    // const unDevliveredTransfers = await this.ethTransferModel.findAll({
+    //   where: { status: SWAP_STATUS.CONFIRMED },
+    // });
 
-    // devliver CKB
-    for (const unDevliveredTransfer of unDevliveredTransfers) {
-      await this.deliverCKB(unDevliveredTransfer, false);
-    }
+    // // devliver CKB
+    // for (const unDevliveredTransfer of unDevliveredTransfers) {
+    //   await this.deliverCKB(unDevliveredTransfer, false);
+    // }
   }
 
   async deliverCKB(transfer: EthTransfer, isNotify: boolean = true) {

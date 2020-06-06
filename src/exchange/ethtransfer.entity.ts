@@ -1,13 +1,4 @@
-import {
-  Column,
-  Model,
-  Table,
-  Index,
-  PrimaryKey,
-  DataType,
-  Default,
-  AutoIncrement,
-} from 'sequelize-typescript';
+import { Column, Model, Table, Index, PrimaryKey, DataType, Default, AutoIncrement } from 'sequelize-typescript';
 
 @Table({})
 export class EthTransfer extends Model<EthTransfer> {
@@ -67,4 +58,23 @@ export class EthTransfer extends Model<EthTransfer> {
 
   @Column(DataType.STRING)
   ckbTxHash: string;
+
+  @Default(0)
+  @Column(DataType.INTEGER)
+  exchangeStatus: number;
+
+  @Column(DataType.BIGINT)
+  sellCurrencyOrderId: number;
+
+  @Column(DataType.BIGINT)
+  buyCKBOrderId: number;
+
+  @Column(DataType.DECIMAL(50, 10))
+  avgCurrencyExchangePrice: number;
+
+  @Column(DataType.DECIMAL(50, 10))
+  avgCkbExchangePrice: number;
+
+  @Column(DataType.DECIMAL(60, 0))
+  ckbExchangeAmount: number;
 }

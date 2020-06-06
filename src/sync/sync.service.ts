@@ -181,30 +181,37 @@ export class SyncService extends NestSchedule {
       if (!transfer.ckbAmount) {
         transfer.status = SWAP_STATUS.IGNORED;
       } else {
-        const {
-          swapFeeAmount,
-          ckbAmount: convertedCkbAmount,
-          tokenPrice,
-          ckbPrice,
-        } = await this.exchangeService.ConvertAsset(token, transfer.amount);
+        const { swapFeeAmount, ckbAmount, tokenPrice, ckbPrice } = await this.exchangeService.estimateExchangeAsset(
+          token,
+          transfer.amount,
+        );
         this.logger.info(
-          `tokenPrice=${tokenPrice}, ckbPrice=${ckbPrice}, tokenAmount=${transfer.amount}, ckbAmount=${transfer.ckbAmount}, convertedCkbAmount = ${convertedCkbAmount}`,
+          `tokenPrice=${tokenPrice}, ckbPrice=${ckbPrice}, tokenAmount=${transfer.amount}, ckbAmount=${transfer.ckbAmount}, convertedCkbAmount = ${ckbAmount} swapFeeAmount=${swapFeeAmount}`,
           SyncService.name,
         );
 
         if (
-          convertedCkbAmount / 10 ** 8 < this.config.MIN_TRANSFER_CKB_AMOUNT ||
-          convertedCkbAmount / 10 ** 8 > this.config.MAX_TRANSFER_CKB_AMOUNT ||
+          ckbAmount / 10 ** 8 < this.config.MIN_TRANSFER_CKB_AMOUNT ||
+          ckbAmount / 10 ** 8 > this.config.MAX_TRANSFER_CKB_AMOUNT ||
           !transfer.ckbAmount
         ) {
           transfer.status = SWAP_STATUS.IGNORED;
         }
 
+        // // buy CKB and sell Assets in HUOBIPro
+        // const { avgCkbPrice, avgTokenPrice, convertedCkbAmount } = await this.exchangeService.exchangeAsset(
+        //   token,
+        //   Number((transfer.amount - swapFeeAmount).toFixed(4)),
+        //   tokenPrice,
+        //   ckbPrice,
+        //   transfer.id,
+        // );
+
         transfer.currencyPrice = tokenPrice;
         transfer.ckbPrice = ckbPrice;
-        transfer.convertedCkbAmount = convertedCkbAmount;
+        transfer.convertedCkbAmount = ckbAmount;
         transfer.swapFee = swapFeeAmount;
-        transfer.transferCkbAmount = Math.min(Math.round(convertedCkbAmount / 10 ** 8) * 10 ** 8, transfer.ckbAmount);
+        transfer.transferCkbAmount = Math.min(Math.round(ckbAmount / 10 ** 8) * 10 ** 8, transfer.ckbAmount);
       }
     }
 

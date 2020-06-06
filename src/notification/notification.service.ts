@@ -4,6 +4,7 @@ import { LoggerService } from 'nest-logger';
 import { EthTransfer } from 'src/exchange/ethtransfer.entity';
 import { SWAP_STATUS } from 'src/util/constant';
 import { fromWei, toBN } from 'web3-utils';
+import { format } from 'util';
 
 @Injectable()
 export class NotificationService {
@@ -13,6 +14,23 @@ export class NotificationService {
     private readonly loggerService: LoggerService,
   ) {}
 
+  async sendErrorInfo(info, exception) {
+    try {
+      const content = format('Error Info: %s %s ', info, exception instanceof Error ? exception?.stack : exception);
+      const swapWebHook = this.configService.SWAP_WEBHOOK;
+      const result = await this.httpService
+        .post(swapWebHook, content, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        .toPromise();
+      return result.data;
+    } catch (err) {
+      this.loggerService.error('send err info failed', info);
+    }
+  }
+
   async sendSwapResult(ethTransfer: EthTransfer, success: boolean) {
     const content = this.buildNotification(ethTransfer, success);
     const swapWebHook = this.configService.SWAP_WEBHOOK;
@@ -21,7 +39,6 @@ export class NotificationService {
         headers: {
           'Content-Type': 'application/json',
         },
-        // httpsAgent: new HttpsProxyAgent('http://127.0.0.1:1087'),
       })
       .toPromise();
     return result.data;

@@ -5,6 +5,8 @@ import { LoggerService } from 'nest-logger';
 import { ConfigService } from 'src/config/config.service';
 import { RedisService } from 'nestjs-redis';
 import * as web3Utils from 'web3-utils';
+import { Op } from 'sequelize';
+import { ExchangeService } from 'src/exchange/exchange.service';
 
 @Injectable()
 export class SwapService {
@@ -15,6 +17,7 @@ export class SwapService {
     private readonly ethTransferModel: typeof EthTransfer,
     private readonly logger: LoggerService,
     private readonly config: ConfigService,
+    private readonly exchangeService: ExchangeService,
     private readonly redisService: RedisService,
   ) {
     this.depositEthAddress = this.config.get('ETH_DEPOSIT_ADDRESS');
@@ -28,7 +31,12 @@ export class SwapService {
 
     // fetch transfer from table order by id desc
     const transfers = await this.ethTransferModel.findAll({
-      where: { from: ethAddress },
+      where: {
+        from: ethAddress,
+        status: {
+          [Op.ne]: SWAP_STATUS.IGNORED,
+        },
+      },
       order: [['id', 'desc']],
     });
     // return transfers;
@@ -78,7 +86,9 @@ export class SwapService {
     const tokenList = this.config.tokenList;
     const chain = this.config.get('ETH_CHAIN');
     const feeRate = this.config.SWAP_FEE_RATE;
-    const swapCKBAmountList = this.config.ckbAmountList;
+
+    const minSwapCKBAmount = await this.redisService.getClient().get(`MIN_SWAP_CKB_AMOUNT`);
+    const swapCKBAmountList = this.config.ckbAmountList.filter(item => item > Number(minSwapCKBAmount));
 
     return {
       chain,
@@ -93,13 +103,14 @@ export class SwapService {
     const { toBN } = web3Utils;
     const tokenList = this.config.tokenList;
 
+    const assetPrices = this.exchangeService.getAssetPrice();
     const tokenRateList = [];
     for (const token of tokenList) {
       const { symbol } = token;
-      const price = await this.redisService.getClient().get(`${symbol}_price`);
+      const price = assetPrices[symbol].price;
       tokenRateList.push({ symbol, price });
     }
-    const ckbPrice = await this.redisService.getClient().get(`CKB_price`);
+    const ckbPrice = assetPrices['CKB'].price;
 
     const pricePlusRate =
       toBN(Math.floor(Number(ckbPrice) * 10 ** 8))
