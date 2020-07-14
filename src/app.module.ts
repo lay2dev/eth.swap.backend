@@ -8,6 +8,7 @@ import { SyncModule } from './sync/sync.module';
 import { CkbModule } from './ckb/ckb.module';
 import { SwapModule } from './swap/swap.module';
 import { NotificationModule } from './notification/notification.module';
+import { StoreModule } from './store/store.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { NotificationModule } from './notification/notification.module';
     CkbModule,
     SwapModule,
     NotificationModule,
+    StoreModule,
   ],
   controllers: [],
   providers: [],

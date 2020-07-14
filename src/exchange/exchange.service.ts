@@ -55,10 +55,11 @@ export class ExchangeService extends NestSchedule {
       this.assetPrices[symbol] = { symbol, price: 1 };
       this.assetBalance[symbol] = 0;
     }
-
-    this.initExchange();
-    this.initWSMarketData();
-    this.initWSAssetOrder();
+    if (this.config.ENABLE_EXCHANGE) {
+      this.initExchange();
+      this.initWSMarketData();
+      this.initWSAssetOrder();
+    }
   }
 
   async initExchange() {

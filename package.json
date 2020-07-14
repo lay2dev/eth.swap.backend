@@ -38,6 +38,7 @@
     "nest-logger": "^5.0.1",
     "nest-schedule": "^0.6.4",
     "nestjs-redis": "^1.2.7",
+    "querystring": "^0.2.0",
     "reflect-metadata": "^0.1.13",
     "rimraf": "^3.0.0",
     "rxjs": "^6.5.3",

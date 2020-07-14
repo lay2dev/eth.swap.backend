@@ -58,6 +58,10 @@ export class ConfigService {
     return this.envConfig.SWAP_WEBHOOK;
   }
 
+  get ENABLE_EXCHANGE(): boolean {
+    return this.envConfig.ENABLE_EXCHANGE === 'true';
+  }
+
   get HBG_WS_URL(): string {
     return this.envConfig.HBG_WS_URL;
   }
